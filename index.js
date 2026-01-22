@@ -6,6 +6,33 @@ app.use(express.json({ limit: "2mb" }));
 
 app.get("/health", (_, res) => res.status(200).send("ok"));
 
+app.get("/debug-gas", async (req, res) => {
+  try {
+    const gas = process.env.APPS_SCRIPT_URL || "";
+    const secret = process.env.TV_SECRET || "";
+    const url = gas ? `${gas}?key=${encodeURIComponent(secret)}` : "";
+
+    if (!gas) return res.status(500).json({ ok:false, error:"APPS_SCRIPT_URL missing" });
+    if (!secret) return res.status(500).json({ ok:false, error:"TV_SECRET missing" });
+
+    const r = await fetch(url);
+    const text = await r.text();
+
+    // Return only a safe preview (no secret)
+    return res.status(200).json({
+      ok: true,
+      apps_script_url: gas,
+      list_url_status: r.status,
+      response_starts_with: text.slice(0, 80),
+      looks_like_html: text.trim().startsWith("<"),
+      looks_like_json: text.trim().startsWith("{")
+    });
+  } catch (e) {
+    return res.status(500).json({ ok:false, error:String(e?.message || e) });
+  }
+});
+
+
 const BINANCE_BASE = process.env.BINANCE_BASE || "https://data-api.binance.vision"; // public market data :contentReference[oaicite:2]{index=2}
 
 function cleanTicker(s) {
